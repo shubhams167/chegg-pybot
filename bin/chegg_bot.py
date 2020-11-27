@@ -1,61 +1,149 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 import re
-from util.utility import generate_random_delay
+from util.utility import generate_random_delay, solve_captcha_manually
 from util.constant import *
 
 
 class CheggBot:
+    def __init__(self):
+        self.current_qid = None
+
     def login_to_chegg(self, id, password):
-        self.driver.get("https://www.chegg.com")
-        sign_in_btn = self.driver.find_element_by_xpath('//*[@id="eggshell-15"]/a')
-        generate_random_delay()
-        sign_in_btn.click()
+        try:
+            self.driver.get("https://www.chegg.com")
+            sign_in_btn = self.driver.find_element_by_xpath('//*[@id="eggshell-15"]/a')
 
-        email_field = self.driver.find_element_by_xpath('//*[@id="emailForSignIn"]')
-        password_field = self.driver.find_element_by_xpath(
-            '//*[@id="passwordForSignIn"]'
-        )
+            generate_random_delay()  # Delay
 
-        generate_random_delay()
-        email_field.send_keys(id)
-        password_field.send_keys(password)
-        password_field.send_keys(Keys.RETURN)
+            sign_in_btn.click()
+
+            email_field = self.driver.find_element_by_xpath('//*[@id="emailForSignIn"]')
+            password_field = self.driver.find_element_by_xpath(
+                '//*[@id="passwordForSignIn"]'
+            )
+
+            generate_random_delay()  # Delay
+
+            email_field.send_keys(id)
+            password_field.send_keys(password)
+            password_field.send_keys(Keys.RETURN)
+        except Exception as err:
+            print(err)
+
+    ##############################################################################################################
+    ##################################### GET QUESTION TEXT FUNCTIONS ############################################
+    ##############################################################################################################
+
+    def get_question_text(self):
+        generate_random_delay()  # Delay
+        try:
+            self.current_qid = self._get_qid()
+            print(f"Question ID: {self.current_qid}")
+            # Check if question has image(s) or not
+            if self._does_question_contain_images():
+                text = self._get_question_transcript()
+            else:
+                text = self.driver.find_element_by_class_name("question").get_attribute(
+                    "innerText"
+                )
+            return text
+        except Exception as err:
+            print(err)
+        return None
+
+    def _does_question_contain_images(self):
+        try:
+            inner_html = self.driver.find_element_by_class_name(
+                "question"
+            ).get_attribute("innerHTML")
+            is_img_tag_present = re.search("<img ", inner_html, re.M)
+            if is_img_tag_present:
+                return True
+        except Exception as err:
+            print(err)
+        return False
+
+    def _get_question_transcript(self):
+        try:
+            original_tab = self.driver.current_window_handle
+            self.open_new_tab(CHEGG_QUESTION_BASE_URL + self.current_qid)
+            # Get the transcript
+            transcript = self.driver.find_element_by_class_name(
+                "transcribed-image-text-show"
+            ).text
+
+            generate_random_delay()  # Delay
+
+            self.close_recent_tab()
+            # Switch to original tab
+            self.driver.switch_to.window(original_tab)
+            return transcript
+        except Exception as err:
+            print(err)
+        return None
+
+    def _get_qid(self):
+        try:
+            logs = self.driver.get_log("browser")
+            for log in logs:
+                if log["level"] == "INFO":
+                    match = re.search("SQid : (\d+)", log["message"])
+                    if match is not None:
+                        # Return the captured group
+                        return match.group(1)
+        except Exception as err:
+            print(err)
+        return None
+
+    ##############################################################################################################
+    ########################################### SEARCH FUNCTIONS #################################################
+    ##############################################################################################################
 
     def search_question(self, text):
+        generate_random_delay()  # Delay
         try:
-            if self.switch_to_tab(CHEGG_RESULTS_PAGE_BASE_URL):
-                self.search_question_on_results_page(text)
+            if self.switch_to_tab_with_matching_url(CHEGG_RESULTS_PAGE_BASE_URL):
+                self._search_question_on_results_page(text)
             else:
-                self.search_question_on_homepage(text)
+                self.open_new_tab(CHEGG_HOMEPAGE_URL)
+                self._search_question_on_homepage(text)
         except Exception as err:
             print(err)
             return False
         return True
 
-    def search_question_on_homepage(self, text):
+    def _search_question_on_homepage(self, text):
         try:
-            self.driver.get(CHEGG_HOMEPAGE_URL)
             search_field = self.driver.find_element_by_xpath(
                 '//*[@id="chegg-searchbox"]'
             )
             search_field.click()
-            search_field.clear()
-            generate_random_delay()
+
+            generate_random_delay()  # Delay
+
             search_field.send_keys(text)
+
+            generate_random_delay()  # Delay
+
             search_field.send_keys(Keys.RETURN)
         except Exception as err:
             print(err)
             return False
         return True
 
-    def search_question_on_results_page(self, text):
+    def _search_question_on_results_page(self, text):
         try:
             search_field = self.driver.find_element_by_xpath(
                 '//*[@id="chegg-searchbox"]'
             )
             search_field.click()
-            generate_random_delay()
+            self.driver.execute_script(
+                "document.querySelector('#chegg-searchbox').value = ''"
+            )
+
+            generate_random_delay()  # Delay
+
             search_field.send_keys(text)
             search_field.send_keys(Keys.RETURN)
         except Exception as err:
@@ -64,15 +152,19 @@ class CheggBot:
         return True
 
     def process_results(self):
+        generate_random_delay()  # Delay
         try:
-            generate_random_delay()
-            self.select_study_tab()
+            # At this point, reCaptcha comes quite often
+            if self.is_bot_compromised():
+                if not self.solve_captcha_automatically():
+                    solve_captcha_manually()
 
-            num_results = self.get_search_result_count()
+            self._select_study_tab()
+            num_results = self._get_search_result_count()
             if num_results == -1:
-                print("No results found for this question!")
-                return False
+                return 0
 
+            print("Search results:")
             for i in range(1, num_results + 1):
                 question = self.driver.find_element_by_css_selector(
                     f".automation-section-1-serp-result-{i} > div:nth-child(1) > a:nth-child(1) > div:nth-child(1) > div:nth-child(2)"
@@ -83,20 +175,64 @@ class CheggBot:
                 percentage = round(total_em_tags * 100 / total_words)
                 print(f"\tAnswer {i}: {percentage}% matching")
                 if percentage >= THRESHOLD_PERCENTAGE:
-                    print("Relevant result(s) found!")
-                    return True  # Function executed successfully
-
-            print("No relevant results found!")
-            return True  # Function executed successfully
+                    return 1
+            return 0
         except Exception as err:
             print(err)
-            return False
+            return -1
 
-    """
-        Helper functions
-    """
+    ##############################################################################################################
+    ########################################### HELPER FUNCTIONS #################################################
+    ##############################################################################################################
 
-    def select_study_tab(self):
+    def start_answering(self):
+        try:
+            self.driver.get(CHEGG_EXPERT_ANSWER_URL)
+        except Exception as err:
+            print(err)
+
+    def skip_question(self):
+        pass
+
+    def click_on_answer(self):
+        try:
+            self.driver.find_element_by_id("ques-ans-btn").click()
+        except Exception as err:
+            print(err)
+
+    def stop_answering(self):
+        try:
+            self.driver.find_element_by_id("skipQuestion-Leave").click()
+        except Exception as err:
+            print(err)
+
+    def submit_answer(self):
+        pass
+
+    def open_new_tab(self, url):
+        try:
+            # Open a new blank tab
+            self.driver.execute_script(f"window.open('')")
+            # Switch to newly opened tab
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            # Open question page
+            self.driver.get(url)
+        except Exception as err:
+            print(err)
+
+    def close_recent_tab(self):
+        try:
+            # Switch to recently opened tab
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            # Close the current tab
+            self.driver.close()
+        except Exception as err:
+            print(err)
+
+    def refresh_current_tab(self):
+        self.driver.refresh()
+
+    def _select_study_tab(self):
         # Check if "Study" tab is selected or not, if not then select it
         try:
             study_tab = self.driver.find_element_by_xpath(
@@ -107,13 +243,14 @@ class CheggBot:
             print(err)
             return False
 
+        generate_random_delay()  # Delay
+
         if is_selected != "true":
             study_tab.click()
         return True
 
-    def switch_to_tab(self, url):
+    def switch_to_tab_with_matching_url(self, url):
         try:
-            num_tabs = len(self.driver.window_handles)
             for tab in self.driver.window_handles:
                 self.driver.switch_to.window(tab)
                 current_url = self.driver.current_url
@@ -123,7 +260,7 @@ class CheggBot:
             print(err)
         return False  # Switch failed
 
-    def is_bot_detected(self):
+    def is_bot_compromised(self):
         try:
             title_text = self.driver.find_element_by_xpath(
                 "/html/body/section/div[2]/div/h1"
@@ -135,11 +272,35 @@ class CheggBot:
             return True  # Bot detected
         return False  # Bot not detected
 
-    def get_search_result_count(self):
+    def solve_captcha_automatically(self):
         try:
-            num_results = len(
-                self.driver.find_elements_by_css_selector(".detjfS > div")
+            iframe = self.driver.find_element_by_xpath(
+                "//iframe[starts-with(@name, 'a-') and starts-with(@src, 'https://www.google.com/recaptcha')]"
             )
-        except:
-            return -1
+            self.driver.switch_to.frame(iframe)
+            self.driver.find_element_by_css_selector("div.rc-anchor-content").click()
+            self.driver.switch_to.default_content()
+        except Exception as err:
+            print(err)
+            return False
+
+        generate_random_delay()  # Delay
+        return True
+
+    def _get_search_result_count(self):
+        num_results = 0
+        try:
+            container = self.driver.find_element_by_xpath(
+                '//*[@id="se-search-serp"]/div/div[1]/div/div[2]/div[2]/div'
+            )
+            while num_results < 8 and container.find_element_by_xpath(
+                f'./div[@data-area="result{num_results + 1}"]'
+            ):
+                num_results += 1
+
+        except Exception as err:
+            print(err)
+            if num_results == 0:
+                return -1
         return num_results
+

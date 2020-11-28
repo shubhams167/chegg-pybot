@@ -86,12 +86,14 @@ class CheggBot:
     def _get_qid(self):
         try:
             logs = self.driver.get_log("browser")
+            qids = []
             for log in logs:
                 if log["level"] == "INFO":
                     match = re.search("SQid : (\d+)", log["message"])
                     if match is not None:
-                        # Return the captured group
-                        return match.group(1)
+                        qids.append(match.group(1))
+            # Return last captured qid
+            return qids[-1]
         except Exception as err:
             print(err)
         return None

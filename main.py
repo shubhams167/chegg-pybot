@@ -1,12 +1,11 @@
-from bin.chrome_chegg_bot import *
-from bin.firefox_chegg_bot import *
+from bin.chrome_chegg_bot import ChromeCheggBot
 from util.utility import (
     get_submit_or_skip,
-    solve_captcha_manually,
     resolve_issues_manually,
     shorten_text,
     get_skip_or_answer,
 )
+from util.constant import CHEGG_EXPERT_ANSWER_URL
 
 
 def autopilot(driver: ChromeCheggBot):
@@ -16,31 +15,20 @@ def autopilot(driver: ChromeCheggBot):
     while True:
         text = driver.get_question_text()
         if text is None:
-            if driver.is_bot_compromised():
-                solve_captcha_manually()
-            else:
-                resolve_issues_manually()
+            resolve_issues_manually()
             driver.switch_to_tab_with_matching_url(CHEGG_EXPERT_ANSWER_URL)
             driver.skip_question()
-            continue
+            return
 
         if not driver.search_question(shorten_text(text)):
             # Check if bot has been detected
-            if driver.is_bot_compromised():
-                solve_captcha_manually()
-            else:
-                resolve_issues_manually()
+            resolve_issues_manually()
             driver.switch_to_tab_with_matching_url(CHEGG_EXPERT_ANSWER_URL)
             driver.skip_question()
-            continue
+            return
 
         result = driver.process_results()
         if result == -1:
-            # Check if bot has been detected
-            if driver.is_bot_compromised():
-                solve_captcha_manually()
-            else:
-                resolve_issues_manually()
             driver.switch_to_tab_with_matching_url(CHEGG_EXPERT_ANSWER_URL)
             driver.skip_question()
             continue
@@ -63,26 +51,15 @@ def search_automatically(driver: ChromeCheggBot):
     driver.switch_to_tab_with_matching_url(CHEGG_EXPERT_ANSWER_URL)
     text = driver.get_question_text()
     if text is None:
-        if driver.is_bot_compromised():
-            solve_captcha_manually()
-            return
         resolve_issues_manually()
         return
 
     if not driver.search_question(shorten_text(text)):
-        # Check if bot has been detected
-        if driver.is_bot_compromised():
-            solve_captcha_manually()
-            return
         resolve_issues_manually()
         return
 
     result = driver.process_results()
     if result == -1:
-        # Check if bot has been detected
-        if driver.is_bot_compromised():
-            solve_captcha_manually()
-            return
         resolve_issues_manually()
         return
     if result == 1:

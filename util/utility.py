@@ -8,7 +8,7 @@ def generate_random_delay():
     idx = 0
     for i in range(0, 10 * (delay + 1), 1):
         print(
-            " " + animation[idx % len(animation)], end="\r",
+            animation[idx % len(animation)], end="\r",
         )
         idx += 1
         sleep(0.1)

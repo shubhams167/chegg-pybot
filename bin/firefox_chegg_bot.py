@@ -1,4 +1,6 @@
-from .chegg_bot import *
+from selenium import webdriver
+from .chegg_bot import CheggBot
+from util.constant import FIREFOX_PROFILE_PATH, TIMEOUT_TIME
 
 
 class FirefoxCheggBot(CheggBot):

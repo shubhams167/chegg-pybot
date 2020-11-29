@@ -1,30 +1,32 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 import re
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException
 from util.utility import generate_random_delay, solve_captcha_manually
-from util.constant import *
+from util.constant import (
+    CHEGG_HOMEPAGE_URL,
+    CHEGG_EXPERT_ANSWER_URL,
+    CHEGG_QUESTION_BASE_URL,
+    CHEGG_RESULTS_PAGE_BASE_URL,
+    THRESHOLD_PERCENTAGE,
+)
 
 
 class CheggBot:
     def __init__(self):
         self.current_qid = None
+        self.driver = None
 
     def login_to_chegg(self, id, password):
         try:
             self.driver.get("https://www.chegg.com")
             sign_in_btn = self.driver.find_element_by_xpath('//*[@id="eggshell-15"]/a')
-
             generate_random_delay()  # Delay
-
             sign_in_btn.click()
-
             email_field = self.driver.find_element_by_xpath('//*[@id="emailForSignIn"]')
             password_field = self.driver.find_element_by_xpath(
                 '//*[@id="passwordForSignIn"]'
             )
-
             generate_random_delay()  # Delay
-
             email_field.send_keys(id)
             password_field.send_keys(password)
             password_field.send_keys(Keys.RETURN)
@@ -68,13 +70,26 @@ class CheggBot:
         try:
             original_tab = self.driver.current_window_handle
             self.open_new_tab(CHEGG_QUESTION_BASE_URL + self.current_qid)
+        except Exception as err:
+            print(err)
+            return None
+        try:
             # Get the transcript
             transcript = self.driver.find_element_by_class_name(
                 "transcribed-image-text-show"
             ).text
+        except NoSuchElementException as err:
+            # At this point, reCaptcha comes quite often
+            if self.is_bot_compromised():
+                if not self.solve_captcha_automatically():
+                    solve_captcha_manually()
 
-            generate_random_delay()  # Delay
-
+        generate_random_delay()  # Delay
+        try:
+            # Get the transcript
+            transcript = self.driver.find_element_by_class_name(
+                "transcribed-image-text-show"
+            ).text
             self.close_recent_tab()
             # Switch to original tab
             self.driver.switch_to.window(original_tab)
@@ -120,14 +135,21 @@ class CheggBot:
             search_field = self.driver.find_element_by_xpath(
                 '//*[@id="chegg-searchbox"]'
             )
+        except Exception as err:
+            print(err)
+            # At this point, reCaptcha comes quite often
+            if self.is_bot_compromised():
+                if not self.solve_captcha_automatically():
+                    solve_captcha_manually()
+
+        try:
+            search_field = self.driver.find_element_by_xpath(
+                '//*[@id="chegg-searchbox"]'
+            )
             search_field.click()
-
             generate_random_delay()  # Delay
-
             search_field.send_keys(text)
-
             generate_random_delay()  # Delay
-
             search_field.send_keys(Keys.RETURN)
         except Exception as err:
             print(err)
@@ -143,9 +165,7 @@ class CheggBot:
             self.driver.execute_script(
                 "document.querySelector('#chegg-searchbox').value = ''"
             )
-
             generate_random_delay()  # Delay
-
             search_field.send_keys(text)
             search_field.send_keys(Keys.RETURN)
         except Exception as err:
@@ -162,9 +182,9 @@ class CheggBot:
             if self.is_bot_compromised():
                 if not self.solve_captcha_automatically():
                     solve_captcha_manually()
-            self._select_study_tab()
 
         try:
+            self._select_study_tab()
             num_results = self._get_search_result_count()
             if num_results == -1:
                 return 0
@@ -247,7 +267,6 @@ class CheggBot:
                 '//*[@id="search-results-tabs_tabheader_2"]'
             )
             is_selected = study_tab.get_attribute("aria-selected")
-
             if is_selected != "true":
                 study_tab.click()
         except Exception as err:
@@ -265,7 +284,6 @@ class CheggBot:
         return False  # Switch failed
 
     def is_bot_compromised(self):
-        print("is_bot_cmprisd")
         try:
             title_text = self.driver.find_element_by_xpath(
                 "/html/body/section/div[2]/div/h1"
@@ -284,6 +302,12 @@ class CheggBot:
             )
             self.driver.switch_to.frame(iframe)
             self.driver.find_element_by_css_selector("div.rc-anchor-content").click()
+            # Check if checkbox checkmark is applied or not
+            style = self.driver.find_element_by_class_name(
+                "recaptcha-checkbox-checkmark"
+            ).get_attribute("style")
+            if style == "null":
+                return False  # Proceed to fill captcha manually
             self.driver.switch_to.default_content()
         except Exception as err:
             print(err)

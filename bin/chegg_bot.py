@@ -154,18 +154,25 @@ class CheggBot:
         return True
 
     def process_results(self):
-        generate_random_delay()  # Delay
         try:
+            self._select_study_tab()
+        except Exception as err:
+            print(err)
             # At this point, reCaptcha comes quite often
             if self.is_bot_compromised():
                 if not self.solve_captcha_automatically():
                     solve_captcha_manually()
-
             self._select_study_tab()
+
+        try:
             num_results = self._get_search_result_count()
             if num_results == -1:
                 return 0
+        except Exception as err:
+            print(err)
+            return -1
 
+        try:
             print("Search results:")
             for i in range(1, num_results + 1):
                 question = self.driver.find_element_by_css_selector(
@@ -178,10 +185,9 @@ class CheggBot:
                 print(f"\tAnswer {i}: {percentage}% matching")
                 if percentage >= THRESHOLD_PERCENTAGE:
                     return 1
-            return 0
         except Exception as err:
             print(err)
-            return -1
+        return 0
 
     ##############################################################################################################
     ########################################### HELPER FUNCTIONS #################################################
@@ -241,15 +247,11 @@ class CheggBot:
                 '//*[@id="search-results-tabs_tabheader_2"]'
             )
             is_selected = study_tab.get_attribute("aria-selected")
+
+            if is_selected != "true":
+                study_tab.click()
         except Exception as err:
-            print(err)
-            return False
-
-        generate_random_delay()  # Delay
-
-        if is_selected != "true":
-            study_tab.click()
-        return True
+            raise err
 
     def switch_to_tab_with_matching_url(self, url):
         try:
@@ -263,6 +265,7 @@ class CheggBot:
         return False  # Switch failed
 
     def is_bot_compromised(self):
+        print("is_bot_cmprisd")
         try:
             title_text = self.driver.find_element_by_xpath(
                 "/html/body/section/div[2]/div/h1"

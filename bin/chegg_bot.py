@@ -265,7 +265,6 @@ class CheggBot:
         return False  # Switch failed
 
     def is_bot_compromised(self):
-        print("is_bot_cmprisd")
         try:
             title_text = self.driver.find_element_by_xpath(
                 "/html/body/section/div[2]/div/h1"

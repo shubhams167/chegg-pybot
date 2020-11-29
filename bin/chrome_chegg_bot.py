@@ -1,6 +1,8 @@
 from .chegg_bot import *
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import TimeoutException
+from time import time
 
 
 class ChromeCheggBot(CheggBot):
@@ -22,15 +24,24 @@ class ChromeCheggBot(CheggBot):
         print("Chrome opened\n")
 
     def skip_question(self):
-        generate_random_delay()  # Delay
         try:
-            # TODO: Check if it is taking forever to skip, then that means bot has been detected
-
+            start_time = time()
             self.driver.find_element_by_id("ext-skip-btn").click()
-            while self.driver.find_element_by_id("countdown").text != "9 min 55 sec":
-                pass
+            while self.driver.find_element_by_id("countdown").text != "10 min":
+                end_time = time()
+                elapsed_time = end_time - start_time
+                if elapsed_time >= TIMEOUT_TIME:
+                    raise TimeoutException
+
         except StaleElementReferenceException as err:
             generate_random_delay()  # Delay
+        except TimeoutException as err:
+            # Refresh page
+            self.refresh_current_tab()
+            # Check if bot has been compromised or not
+            if self.is_bot_compromised():
+                if not self.solve_captcha_automatically():
+                    solve_captcha_manually()
         except Exception as err:
             print(err)
             return

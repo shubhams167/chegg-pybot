@@ -1,8 +1,11 @@
-from .chegg_bot import *
+from selenium import webdriver
+from .chegg_bot import CheggBot
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.common.exceptions import TimeoutException
 from time import time
+from util.constant import CHROME_PROFILE_PATH, TIMEOUT_TIME
+from util.utility import generate_random_delay, solve_captcha_manually
 
 
 class ChromeCheggBot(CheggBot):

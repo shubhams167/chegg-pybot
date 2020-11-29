@@ -1,31 +1,32 @@
-from selenium import webdriver
+import re
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
-import re
 from util.utility import generate_random_delay, solve_captcha_manually
-from util.constant import *
+from util.constant import (
+    CHEGG_HOMEPAGE_URL,
+    CHEGG_EXPERT_ANSWER_URL,
+    CHEGG_QUESTION_BASE_URL,
+    CHEGG_RESULTS_PAGE_BASE_URL,
+    THRESHOLD_PERCENTAGE,
+)
 
 
 class CheggBot:
     def __init__(self):
         self.current_qid = None
+        self.driver = None
 
     def login_to_chegg(self, id, password):
         try:
             self.driver.get("https://www.chegg.com")
             sign_in_btn = self.driver.find_element_by_xpath('//*[@id="eggshell-15"]/a')
-
             generate_random_delay()  # Delay
-
             sign_in_btn.click()
-
             email_field = self.driver.find_element_by_xpath('//*[@id="emailForSignIn"]')
             password_field = self.driver.find_element_by_xpath(
                 '//*[@id="passwordForSignIn"]'
             )
-
             generate_random_delay()  # Delay
-
             email_field.send_keys(id)
             password_field.send_keys(password)
             password_field.send_keys(Keys.RETURN)

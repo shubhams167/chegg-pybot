@@ -3,7 +3,8 @@ from time import sleep
 
 
 def generate_random_delay():
-    delay = random.choice([3, 4, 5, 6, 7, 8, 9, 10])
+    # delay = random.choice([3, 4, 5, 6, 7, 8, 9, 10])
+    delay = 0
     animation = "|/-\\"
     idx = 0
     for i in range(0, 10 * (delay + 1), 1):

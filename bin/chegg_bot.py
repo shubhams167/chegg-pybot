@@ -40,7 +40,10 @@ class CheggBot:
     def get_question_text(self):
         generate_random_delay()  # Delay
         try:
-            self.current_qid = self._get_qid()
+            qid = self._get_qid()
+            if qid != None and qid != self.current_qid:
+                self.current_qid = qid
+
             print(f"Question ID: {self.current_qid}")
             # Check if question has image(s) or not
             if self._does_question_contain_images():

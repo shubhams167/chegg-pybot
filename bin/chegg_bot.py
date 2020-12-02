@@ -267,7 +267,7 @@ class CheggBot:
         # Check if "Study" tab is selected or not, if not then select it
         try:
             study_tab = self.driver.find_element_by_xpath(
-                '//*[@id="search-results-tabs_tabheader_2"]'
+                "//ul[@role='tablist']/li[3]/a"
             )
             is_selected = study_tab.get_attribute("aria-selected")
             if is_selected != "true":
